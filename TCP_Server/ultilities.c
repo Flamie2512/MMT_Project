@@ -189,7 +189,7 @@ find_account(const char *username) {
     return NULL;
 }
 
-int Create_account(const char *username, const char *password) {
+int create_account(const char *username, const char *password) {
     // check username exists
     for (int i = 0; i < accountCount; i++) {
         if (strcmp(accounts[i].username, username) == 0) {
