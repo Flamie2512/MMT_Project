@@ -18,7 +18,7 @@
 #include "entity/entities.h"
 
 
-
+// Utility function declarations
 int send_request(int sockfd, const char *buf);
 int recv_response(int sockfd, char *buff, size_t size);
 int load_accounts_file(const char *path, Account accounts[], int max_users, int *out_count);
@@ -27,6 +27,21 @@ int load_user_friends(const char *username, FriendRel frs[], int max, int *out_c
 int load_user_requests(const char *username, FriendRequest reqs[], int max, int *out_count);
 int load_user_notifications(const char *username, Notification notifs[], int max, int *out_count);
 int find_account(const char *username);
+int mark_notification_seen(int notif_id);
+
+
+//function 
+void login(const char *username, const char *password);
+void logout(const char *username);
+void register_account(const char *username, const char *password);
+void add_favorite(const char *owner, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
+void delete_favorite(const char *owner, int fav_id);
+void edit_favorite(const char *owner, int fav_id, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
+void share_favorite(const char *owner, int fav_id, const char *sharer, const char *tagged);
+void add_friend_request(const char *from, const char *to);
+void accept_friend_request(int req_id);
+void reject_friend_request(int req_id);
+void remove_friend(const char *user_a, const char *user_b);
 
 #define BUFF_SIZE 4096
 #define BACKLOG 2
@@ -40,9 +55,20 @@ pthread_mutex_t account_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void handle_command(client_session_t *session, const char *command){
     if (strncmp(line, "LOGIN|", 6) == 0) {
+        if (sccanf(line + 6, "%63[^|]|%127[^\r\n]", username, password) != 2) {
+            send_request(session->sockfd, "300 Invalid LOGIN format\r\n");
+            return;
+        }
+        login(username, password, session);
         
-    } else if(strncmp(line, "LOGOUT|", 7) == 0) {
-        
+    } else if(strncmp(line, "LOGOUT", 6) == 0) {
+        if(!session->logged_in) {
+            send_request(session->sockfd, "402 Not logged in\r\n");
+            return;
+        }
+        logout(session->username);
+        session->logged_in = 0;
+        session->username[0] = '\0';
     } else if (strncmp(line, "REGISTER|", 9) == 0) {
         
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
@@ -74,6 +100,49 @@ void handle_command(client_session_t *session, const char *command){
     }
 };
 
+void login(const char *username, const char *password, client_session_t *session) {
+    Account *acc = find_account(username);
+    if (!acc) send_request(session->sockfd, "400 Invalid username or password\r\n");
+    if (acc->is_logged_in) {
+        send_request(session->sockfd, "401 Account already logged in\r\n");
+    }
+    if (strcmp(acc->password, password) != 0) {
+        send_request(session->sockfd, "400 Invalid username or password\r\n");
+    } else {
+        acc->is_logged_in = 1;
+        session->logged_in = 1;
+        strncpy(session->username, username, sizeof(session->username)-1);
+        session->username[sizeof(session->username)-1] = '\0';
+        send_request(session->sockfd, "200 Login successful\r\n");
+    }
+    
+    return 0;
+}
+
+void logout(const char *username) {
+    Account *acc = find_account(username);
+    if (acc && acc->is_logged_in) {
+        acc->is_logged_in = 0;
+    }
+    send_request(session->sockfd, "201 Logout successful\r\n");
+}
+
+void add_friend_request(const char *from, const char *to) {
+
+    FriendRequest *reqs;
+    int req_count = 0;
+    if (load_user_requests(from, reqs, MAX_REQUESTS, &req_count) < 0) {
+        send_request(session->sockfd, "500 Internal server error\r\n");
+        return;
+    }
+    for (int i = 0; i < req_count; i++) {
+        if (strcmp(reqs[i].to, to) == 0 && reqs[i].status == 0) {
+            send_request(session->sockfd, "403 Friend request already sent\r\n");
+            return;
+        }
+    }
+    send_request(session->sockfd, "202 Friend request sent\r\n");
+}
 
 
 
@@ -90,6 +159,17 @@ void *handle_client(void *arg) {
 
     client_session_t *session = (client_session_t *)arg;
     message[0] = '\0';
+    FavoritePlace user_favorites[MAX_FAVS];
+    int favorites_count = 0;
+
+    FriendRel user_friends[MAX_FRIENDS];
+    int friends_count = 0;
+
+    FriendRequest user_requests[MAX_REQUESTS];
+    int requests_count = 0;
+
+    Notification user_notifications[MAX_NOTIFS];
+    int notifications_count = 0;
     
     pthread_detach(pthread_self());
     
