@@ -18,6 +18,8 @@
 #include "entity/entities.h"
 
 
+
+
 // Utility function declarations
 int send_request(int sockfd, const char *buf);
 int recv_response(int sockfd, char *buff, size_t size);
@@ -33,7 +35,52 @@ int mark_notification_seen(int notif_id);
 //function 
 void login(const char *username, const char *password);
 void logout(const char *username);
-void register_account(const char *username, const char *password);
+int register_account(const char *username, const char *password) {
+    if (!username || !password) {
+        printf("Error: username or password is NULL\n");
+        return -3;
+    }
+
+    // check username exists
+    for (int i = 0; i < accountCount; i++) {
+        if (strcmp(accounts[i].username, username) == 0) {
+            printf("Error: username '%s' already exists\n", username);
+            return -2;
+        }
+    }
+
+    // check server full
+    if (accountCount >= MAX_USER) {
+        printf("Error: server full, cannot create more accounts\n");
+        return -1;
+    }
+
+    // Create new account
+    Account new_acc;
+    strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
+    new_acc.username[sizeof(new_acc.username) - 1] = '\0';
+    strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
+    new_acc.password[sizeof(new_acc.password) - 1] = '\0';
+    new_acc.status = 1;       // account active
+    new_acc.is_logged_in = 0; // not logged in
+
+    // Add to accounts array
+    accounts[accountCount] = new_acc;
+    accountCount++;
+
+    // Write to account.txt
+    char line[128];
+    snprintf(line, sizeof(line), "%s|%s|1|", username, password);
+    FILE *f = fopen("account.txt", "a");
+    if (f) {
+        fprintf(f, "%s\n", line);
+        fclose(f);
+    } else {
+        perror("fopen account.txt");
+    }
+    return 0;
+}
+
 void add_favorite(const char *owner, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
 void delete_favorite(const char *owner, int fav_id);
 void edit_favorite(const char *owner, int fav_id, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
@@ -59,6 +106,16 @@ void handle_command(client_session_t *session, const char *command){
             send_request(session->sockfd, "300 Invalid LOGIN format\r\n");
             return;
         }
+
+    int reg = register_account(username, password);
+        if (reg == -2) {
+            send_request(session->sockfd, "409 Conflict\r\n"); // Username already exists
+        } else if (reg == -1) {
+            send_request(session->sockfd, "500 Server full\r\n"); //server full
+        } else if(reg == 0) {
+            send_request(session->sockfd, "201 Created\r\n"); // Registration successful
+        }
+
         login(username, password, session);
         
     } else if(strncmp(line, "LOGOUT", 6) == 0) {
