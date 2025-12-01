@@ -107,15 +107,6 @@ void handle_command(client_session_t *session, const char *command){
             return;
         }
 
-    int reg = register_account(username, password);
-        if (reg == -2) {
-            send_request(session->sockfd, "409 Conflict\r\n"); // Username already exists
-        } else if (reg == -1) {
-            send_request(session->sockfd, "500 Server full\r\n"); //server full
-        } else if(reg == 0) {
-            send_request(session->sockfd, "201 Created\r\n"); // Registration successful
-        }
-
         login(username, password, session);
         
     } else if(strncmp(line, "LOGOUT", 6) == 0) {
@@ -127,7 +118,21 @@ void handle_command(client_session_t *session, const char *command){
         session->logged_in = 0;
         session->username[0] = '\0';
     } else if (strncmp(line, "REGISTER|", 9) == 0) {
-        
+        if (sscanf(line + 9, "%63[^|]|%127[^\r\n]", username, password) != 2) {
+            send_request(session->sockfd, "300 Invalid REGISTER format\r\n");
+            return;
+        }
+        int reg_result = register_account(username, password);
+        if (reg_result == 0) {
+            send_request(session->sockfd, "210 Registration successful\r\n");
+        } else if (reg_result == -2) {
+            send_request(session->sockfd, "400 Username already exists\r\n");
+        } else if (reg_result == -1) {
+            send_request(session->sockfd, "500 Server full, cannot register\r\n");
+        } else {
+            send_request(session->sockfd, "500 Internal server error\r\n");
+        }
+
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
         
     } else if (strncmp(line, "LIST_FAVORITES|", 15) == 0) {
