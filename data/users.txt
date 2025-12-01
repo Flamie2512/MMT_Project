@@ -1,7 +1,7 @@
 # users file: format per line
-# username|password|status
-alice|password123|1
-bob|mypassword|0
-charlie|charliepass|1
-dave|davepwd|1
-erin|erinsecure|0
+# username|password
+alice|password123
+bob|mypassword
+charlie|charliepass
+dave|davepwd
+erin|erinsecure

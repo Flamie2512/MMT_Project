@@ -66,32 +66,15 @@ int load_accounts_file(const char *path, Account accounts[], int max_users, int 
         line[strcspn(line, "\r\n")] = '\0';
         Account tmp;
         char *tok, *saveptr = NULL;
-        tok = strtok_r(line, "|", &saveptr); if (!tok) continue; strncpy(tmp.username, tok, sizeof(tmp.username)-1); tmp.username[sizeof(tmp.username)-1]='\0';
-        tok = strtok_r(NULL, "|", &saveptr); if (!tok) continue; strncpy(tmp.password, tok, sizeof(tmp.password)-1); tmp.password[sizeof(tmp.password)-1]='\0';
-        tok = strtok_r(NULL, "|", &saveptr); if (!tok) continue; tmp.status = atoi(tok);
+        tok = strtok_r(line, "|", &saveptr); if (!tok) continue; tmp.username = tok;
+        tok = strtok_r(NULL, "|", &saveptr); if (!tok) continue; tmp.password = tok;
         tmp.is_logged_in = 0;
-        tok = strtok_r(NULL, "|", &saveptr); if (tok) { strncpy(tmp.tagged, tok, sizeof(tmp.tagged)-1); tmp.tagged[sizeof(tmp.tagged)-1]='\0'; } else tmp.tagged[0]='\0';
         accounts[*out_count] = tmp;
         (*out_count)++;
     }
     fclose(f);
     return *out_count;
 }
-
-
-FavoritePlace user_favorites[MAX_FAVS];
-int favorites_count = 0;
-
-FriendRel user_friends[MAX_FRIENDS];
-int friends_count = 0;
-
-FriendRequest user_requests[MAX_REQUESTS];
-int requests_count = 0;
-
-Notification user_notifications[MAX_NOTIFS];
-int notifications_count = 0;
-
-
 
 
 int load_user_favorites(const char *username, FavoritePlace favs[], int max, int *out_count) {

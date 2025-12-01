@@ -3,8 +3,6 @@
 
 #include <time.h>
 
-/* Minimal entities for the class project (simple file storage) */
-
 #define MAX_NAME_LEN 64
 #define MAX_PASS_LEN 128
 #define MAX_TITLE_LEN 128
@@ -15,16 +13,15 @@
 
 typedef struct account_t {
     char username[MAX_NAME_LEN];
-    char password[MAX_PASS_LEN]; /* plaintext or hash depending on choice */
-    int status; /* 1 = active, 0 = locked */
-    int is_logged_in; /* 1 = logged in, 0 = not logged in */
+    char password[MAX_PASS_LEN]; 
+    int is_logged_in; 
 } Account;
 
 typedef struct friend_request_t {
     int id;
     char from[MAX_NAME_LEN];
     char to[MAX_NAME_LEN];
-    int status; /* 0=pending,1=accepted,2=rejected */
+    int status; 
     time_t created_at;
 } FriendRequest;
 
@@ -71,4 +68,4 @@ typedef struct client_session {
     int logged_in; 
 } client_session_t;
 
-#endif /* ENTITY_ENTITIES_H */
+#endif 
