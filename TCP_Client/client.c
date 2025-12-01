@@ -54,6 +54,7 @@ void menu(){
     printf("     TCP CLIENT INTERFACE\n");
     printf("==============================\n");
     printf("Available commands:\n");
+    printf("REGISTER <username> <password> : Register a new account\n");
     printf("USER <username> : This command is used to login.\n");
     printf("POST <message> : This command is used to send a message.\n");
     printf("BYE : This command is used to disconnect.\n");
