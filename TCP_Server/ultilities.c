@@ -188,3 +188,42 @@ find_account(const char *username) {
     }
     return NULL;
 }
+
+int Create_account(const char *username, const char *password) {
+    // check username exists
+    for (int i = 0; i < accountCount; i++) {
+        if (strcmp(accounts[i].username, username) == 0) {
+            return -2;
+        }
+    }
+
+    // check server full
+    if (accountCount >= MAX_USER) {
+        return -1;
+    }
+
+    // Create new account
+    Account new_acc;
+    strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
+    new_acc.username[sizeof(new_acc.username) - 1] = '\0';
+    strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
+    new_acc.password[sizeof(new_acc.password) - 1] = '\0';
+    new_acc.status = 1;       // account active
+    new_acc.is_logged_in = 0; // not logged in
+
+    // Add to accounts array
+    accounts[accountCount] = new_acc;
+    accountCount++;
+
+    // Write to account.txt
+    char line[128];
+    snprintf(line, sizeof(line), "%s|%s|1|", username, password);
+    FILE *f = fopen("account.txt", "a");
+    if (f) {
+        fprintf(f, "%s\n", line);
+        fclose(f);
+    } else {
+        perror("fopen account.txt");
+    }
+    return 0;
+}

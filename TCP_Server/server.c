@@ -34,42 +34,14 @@ int mark_notification_seen(int notif_id);
 void login(const char *username, const char *password);
 void logout(const char *username);
 int register_account(const char *username, const char *password) {
-    // check username exists
-    for (int i = 0; i < accountCount; i++) {
-        if (strcmp(accounts[i].username, username) == 0) {
-            return -2;
+     int cre = create_account(username, password);
+        if (cre == 0) {
+            send_request(session->sockfd, "201 Registration successful\r\n");
+        } else if (cre == -2) {
+            send_request(session->sockfd, "404 Username already exists\r\n");
+        } else {
+            send_request(session->sockfd, "500 Server full\r\n");
         }
-    }
-
-    // check server full
-    if (accountCount >= MAX_USER) {
-        return -1;
-    }
-
-    // Create new account
-    Account new_acc;
-    strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
-    new_acc.username[sizeof(new_acc.username) - 1] = '\0';
-    strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
-    new_acc.password[sizeof(new_acc.password) - 1] = '\0';
-    new_acc.status = 1;       // account active
-    new_acc.is_logged_in = 0; // not logged in
-
-    // Add to accounts array
-    accounts[accountCount] = new_acc;
-    accountCount++;
-
-    // Write to account.txt
-    char line[128];
-    snprintf(line, sizeof(line), "%s|%s|1|", username, password);
-    FILE *f = fopen("account.txt", "a");
-    if (f) {
-        fprintf(f, "%s\n", line);
-        fclose(f);
-    } else {
-        perror("fopen account.txt");
-    }
-    return 0;
 }
 
 void add_favorite(const char *owner, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
@@ -113,14 +85,8 @@ void handle_command(client_session_t *session, const char *command){
             send_request(session->sockfd, "400 Invalid REGISTER format\r\n");
             return;
         }
-        int reg_result = register_account(username, password);
-        if (reg_result == 0) {
-            send_request(session->sockfd, "201 Registration successful\r\n");
-        } else if (reg_result == -2) {
-            send_request(session->sockfd, "400 Username already exists\r\n");
-        } else if (reg_result == -1) {
-            send_request(session->sockfd, "500 Server full, cannot register\r\n");
-        }
+        register_account(username, password);
+
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
         
     } else if (strncmp(line, "LIST_FAVORITES|", 15) == 0) {
