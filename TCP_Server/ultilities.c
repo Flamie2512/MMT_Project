@@ -188,3 +188,57 @@ find_account(const char *username) {
     }
     return NULL;
 }
+
+int create_account(const char *username, const char *password) {
+    if (!username || !password) return -1;
+
+    pthread_mutex_lock(&account_lock);
+
+    // Check if username already exists
+    for (int i = 0; i < accountCount; i++) {
+        if (strcmp(accounts[i].username, username) == 0) {
+            pthread_mutex_unlock(&account_lock);
+            return -2; // username already exists
+        }
+    }
+
+    if (accountCount >= MAX_USER) {
+        pthread_mutex_unlock(&account_lock);
+        return -1; // server full
+    }
+
+    // Create new account
+    Account new_acc;
+    strncpy(new_acc.username, username, sizeof(new_acc.username)-1);
+    new_acc.username[sizeof(new_acc.username)-1] = '\0';
+    strncpy(new_acc.password, password, sizeof(new_acc.password)-1);
+    new_acc.password[sizeof(new_acc.password)-1] = '\0';
+    new_acc.status = 1;
+    new_acc.is_logged_in = 0;
+    new_acc.tagged[0] = '\0';
+
+    accounts[accountCount] = new_acc;
+    accountCount++;
+
+    // Save account to file
+    char line[128];
+    snprintf(line, sizeof(line), "%s|%s|1|", username, password);
+    FILE *f = fopen("account.txt", "a");
+    if (f) {
+        fprintf(f, "%s\n", line);
+        fclose(f);
+    } else {
+        perror("fopen account.txt");
+    }
+
+    pthread_mutex_unlock(&account_lock);
+    return 0;
+}
+
+
+int create_friend_request(const char *from, const char *to) {
+    int new_id = get_next_id_from_file("data/requests.txt");
+    char line[256];
+    snprintf(line, sizeof(line), "%d|%s|%s|%ld", new_id, from, to, time(NULL));
+    return append_line_to_file("data/requests.txt", line);
+}

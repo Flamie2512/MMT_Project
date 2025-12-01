@@ -55,20 +55,9 @@ pthread_mutex_t account_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void handle_command(client_session_t *session, const char *command){
     if (strncmp(line, "LOGIN|", 6) == 0) {
-        if (sccanf(line + 6, "%63[^|]|%127[^\r\n]", username, password) != 2) {
-            send_request(session->sockfd, "300 Invalid LOGIN format\r\n");
-            return;
-        }
-        login(username, password, session);
         
-    } else if(strncmp(line, "LOGOUT", 6) == 0) {
-        if(!session->logged_in) {
-            send_request(session->sockfd, "402 Not logged in\r\n");
-            return;
-        }
-        logout(session->username);
-        session->logged_in = 0;
-        session->username[0] = '\0';
+    } else if(strncmp(line, "LOGOUT|", 7) == 0) {
+        
     } else if (strncmp(line, "REGISTER|", 9) == 0) {
         
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
@@ -96,18 +85,18 @@ void handle_command(client_session_t *session, const char *command){
     } else if (strncmp(line, "LIST_NOTIFICATIONS|", 18) == 0) {
         
     }else {
-        send_request(session->sockfd, "300 Unknown request\r\n");
+        send_request(session->sockfd, "400 Unknown request\r\n");
     }
 };
 
 void login(const char *username, const char *password, client_session_t *session) {
     Account *acc = find_account(username);
-    if (!acc) send_request(session->sockfd, "400 Invalid username or password\r\n");
+    if (!acc) send_request(session->sockfd, "401 Invalid username or password\r\n");
     if (acc->is_logged_in) {
-        send_request(session->sockfd, "401 Account already logged in\r\n");
+        send_request(session->sockfd, "402 Account already logged in\r\n");
     }
     if (strcmp(acc->password, password) != 0) {
-        send_request(session->sockfd, "400 Invalid username or password\r\n");
+        send_request(session->sockfd, "401 Invalid username or password\r\n");
     } else {
         acc->is_logged_in = 1;
         session->logged_in = 1;
@@ -128,7 +117,6 @@ void logout(const char *username) {
 }
 
 void add_friend_request(const char *from, const char *to) {
-
     FriendRequest *reqs;
     int req_count = 0;
     if (load_user_requests(from, reqs, MAX_REQUESTS, &req_count) < 0) {
@@ -140,6 +128,10 @@ void add_friend_request(const char *from, const char *to) {
             send_request(session->sockfd, "403 Friend request already sent\r\n");
             return;
         }
+    }
+    if(cretate_friend_request(from, to) < 0) {
+        send_request(session->sockfd, "500 Internal server error\r\n");
+        return;
     }
     send_request(session->sockfd, "202 Friend request sent\r\n");
 }
