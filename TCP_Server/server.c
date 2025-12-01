@@ -18,8 +18,6 @@
 #include "entity/entities.h"
 
 
-
-
 // Utility function declarations
 int send_request(int sockfd, const char *buf);
 int recv_response(int sockfd, char *buff, size_t size);
@@ -117,7 +115,6 @@ void handle_command(client_session_t *session, const char *command){
         } else if (reg_result == -1) {
             send_request(session->sockfd, "500 Server full, cannot register\r\n");
         }
-
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
         
     } else if (strncmp(line, "LIST_FAVORITES|", 15) == 0) {
