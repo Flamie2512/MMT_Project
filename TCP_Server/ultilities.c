@@ -189,34 +189,33 @@ find_account(const char *username) {
     return NULL;
 }
 
-int create_account(const char *username, const char *password) {
-    if (!username || !password) return -1;
-
-    // Check if username already exists
+int Create_account(const char *username, const char *password) {
+    // check username exists
     for (int i = 0; i < accountCount; i++) {
         if (strcmp(accounts[i].username, username) == 0) {
-            return -2; // username already exists
+            return -2;
         }
     }
 
+    // check server full
     if (accountCount >= MAX_USER) {
-        return -1; // server full
+        return -1;
     }
 
     // Create new account
     Account new_acc;
-    strncpy(new_acc.username, username, sizeof(new_acc.username)-1);
-    new_acc.username[sizeof(new_acc.username)-1] = '\0';
-    strncpy(new_acc.password, password, sizeof(new_acc.password)-1);
-    new_acc.password[sizeof(new_acc.password)-1] = '\0';
-    new_acc.status = 1;
-    new_acc.is_logged_in = 0;
-    new_acc.tagged[0] = '\0';
+    strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
+    new_acc.username[sizeof(new_acc.username) - 1] = '\0';
+    strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
+    new_acc.password[sizeof(new_acc.password) - 1] = '\0';
+    new_acc.status = 1;       // account active
+    new_acc.is_logged_in = 0; // not logged in
 
+    // Add to accounts array
     accounts[accountCount] = new_acc;
     accountCount++;
 
-    // Save account to file
+    // Write to account.txt
     char line[128];
     snprintf(line, sizeof(line), "%s|%s|1|", username, password);
     FILE *f = fopen("account.txt", "a");
@@ -227,12 +226,4 @@ int create_account(const char *username, const char *password) {
         perror("fopen account.txt");
     }
     return 0;
-}
-
-
-int create_friend_request(const char *from, const char *to) {
-    int new_id = get_next_id_from_file("data/requests.txt");
-    char line[256];
-    snprintf(line, sizeof(line), "%d|%s|%s|%ld", new_id, from, to, time(NULL));
-    return append_line_to_file("data/requests.txt", line);
 }
