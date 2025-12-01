@@ -17,6 +17,15 @@
 #include <pthread.h>
 #include "entity/entities.h"
 
+int send_request(int sockfd, const char *buf);
+int recv_response(int sockfd, char *buff, size_t size);
+int load_accounts_file(const char *path, Account accounts[], int max_users, int *out_count);
+int load_user_favorites(const char *username, FavoritePlace favs[], int max, int *out_count);
+int load_user_friends(const char *username, FriendRel frs[], int max, int *out_count);
+int load_user_requests(const char *username, FriendRequest reqs[], int max, int *out_count);
+int load_user_notifications(const char *username, Notification notifs[], int max, int *out_count);
+int find_account(const char *username);
+
 int register_account(const char *username, const char *password) {
     // check username exists
     for (int i = 0; i < accountCount; i++) {
@@ -56,17 +65,6 @@ int register_account(const char *username, const char *password) {
     return 0;
 }
 
-
-
-int send_request(int sockfd, const char *buf);
-int recv_response(int sockfd, char *buff, size_t size);
-int load_accounts_file(const char *path, Account accounts[], int max_users, int *out_count);
-int load_user_favorites(const char *username, FavoritePlace favs[], int max, int *out_count);
-int load_user_friends(const char *username, FriendRel frs[], int max, int *out_count);
-int load_user_requests(const char *username, FriendRequest reqs[], int max, int *out_count);
-int load_user_notifications(const char *username, Notification notifs[], int max, int *out_count);
-int find_account(const char *username);
-
 #define BUFF_SIZE 4096
 #define BACKLOG 2
 #define MAX_USER 3000
@@ -83,22 +81,18 @@ void handle_command(client_session_t *session, const char *command){
     } else if(strncmp(line, "LOGOUT|", 7) == 0) {
         
     } else if (strncmp(command, "REGISTER|", 9) == 0) {
-        char username[50], password[50];
-    
-        if (sscanf(command + 9, "%49[^|]|%49s", username, password) != 2) {
-            send_request(session->sockfd, "400 Bad Request\r\n");
+        if (sscanf(line + 9, "%63[^|]|%127[^\r\n]", username, password) != 2) {
+            send_request(session->sockfd, "400 Invalid REGISTER format\r\n");
             return;
         }
-
-    int reg = register_account(username, password);
-        if (reg == -2) {
-            send_request(session->sockfd, "409 Conflict\r\n"); // Username already exists
-        } else if (reg == -1) {
-            send_request(session->sockfd, "500 Server full\r\n"); //server full
-        } else if(reg == 0) {
-            send_request(session->sockfd, "201 Created\r\n"); // Registration successful
+        int reg_result = register_account(username, password);
+        if (reg_result == 0) {
+            send_request(session->sockfd, "201 Registration successful\r\n");
+        } else if (reg_result == -2) {
+            send_request(session->sockfd, "400 Username already exists\r\n");
+        } else if (reg_result == -1) {
+            send_request(session->sockfd, "500 Server full, cannot register\r\n");
         }
-
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
         
     } else if (strncmp(line, "LIST_FAVORITES|", 15) == 0) {
