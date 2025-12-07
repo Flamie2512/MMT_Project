@@ -17,7 +17,6 @@
 #include <pthread.h>
 #include "entity/entities.h"
 
-
 // Utility function declarations
 int send_request(int sockfd, const char *buf);
 int recv_response(int sockfd, char *buff, size_t size);
@@ -39,8 +38,6 @@ void register_account(const char *username, const char *password) {
             send_request(session->sockfd, "201 Registration successful\r\n");
         } else if (cre == -2) {
             send_request(session->sockfd, "404 Username already exists\r\n");
-        } else {
-            send_request(session->sockfd, "500 Server full\r\n");
         }
 }
 
