@@ -6,6 +6,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+
+#define FAV_DIR  "data"
+#define FAV_PATH "data/favorites.txt"
 
 int send_request(int sockfd, const char *buf) {
     ssize_t s = send(sockfd, buf, strlen(buf), 0);
@@ -189,33 +195,33 @@ find_account(const char *username) {
     return NULL;
 }
 
-int Create_account(const char *username, const char *password) {
-    // check username exists
+int create_account(const char *username, const char *password) {
+    if (!username || !password) return -1;
+
+    pthread_mutex_lock(&account_lock);
+
+    // Check if username already exists
     for (int i = 0; i < accountCount; i++) {
         if (strcmp(accounts[i].username, username) == 0) {
-            return -2;
+            pthread_mutex_unlock(&account_lock);
+            return -2; // username already exists
         }
-    }
-
-    // check server full
-    if (accountCount >= MAX_USER) {
-        return -1;
     }
 
     // Create new account
     Account new_acc;
-    strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
-    new_acc.username[sizeof(new_acc.username) - 1] = '\0';
-    strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
-    new_acc.password[sizeof(new_acc.password) - 1] = '\0';
-    new_acc.status = 1;       // account active
-    new_acc.is_logged_in = 0; // not logged in
+    strncpy(new_acc.username, username, sizeof(new_acc.username)-1);
+    new_acc.username[sizeof(new_acc.username)-1] = '\0';
+    strncpy(new_acc.password, password, sizeof(new_acc.password)-1);
+    new_acc.password[sizeof(new_acc.password)-1] = '\0';
+    new_acc.status = 1;
+    new_acc.is_logged_in = 0;
+    new_acc.tagged[0] = '\0';
 
-    // Add to accounts array
     accounts[accountCount] = new_acc;
     accountCount++;
 
-    // Write to account.txt
+    // Save account to file
     char line[128];
     snprintf(line, sizeof(line), "%s|%s|1|", username, password);
     FILE *f = fopen("account.txt", "a");
@@ -225,5 +231,52 @@ int Create_account(const char *username, const char *password) {
     } else {
         perror("fopen account.txt");
     }
+
+    pthread_mutex_unlock(&account_lock);
     return 0;
+}
+
+int get_next_fav_id() {
+    FILE *f = fopen(FAV_PATH, "r");
+    if (!f) return 1;
+    char line[1024];
+    int max_id = 0;
+    while (fgets(line, sizeof(line), f)) {
+        int id = 0;
+        if (sscanf(line, "%d|", &id) == 1) {
+            if (id > max_id) max_id = id;
+        }
+    }
+    fclose(f);
+    return max_id + 1;
+}
+
+int add_favorite(const char *owner, const char *name, const char *category, const char *location) {
+    if (!owner || !name || !category || !location) return 0;
+
+    FavoritePlace f;
+    memset(&f, 0, sizeof(f));
+    f.id = get_next_fav_id();
+    strncpy(f.owner, owner, sizeof(f.owner)-1); f.owner[sizeof(f.owner)-1] = '\0';
+    strncpy(f.name, name, sizeof(f.name)-1); f.name[sizeof(f.name)-1] = '\0';
+    strncpy(f.category, category, sizeof(f.category)-1); f.category[sizeof(f.category)-1] = '\0';
+    strncpy(f.location, location, sizeof(f.location)-1); f.location[sizeof(f.location)-1] = '\0';
+    f.is_shared = 0;
+    f.sharer[0] = '\0';
+    f.tagged[0] = '\0';
+    f.created_at = time(NULL);
+
+    FILE *fp = fopen(FAV_PATH, "a");
+    if (!fp) {
+        perror("add_favorite: fopen");
+        return -1;
+    }
+
+    int wrote = fprintf(fp, "%d|%s|%s|%s|%s|%d|%s|%s|%ld\n",
+                       f.id, f.owner, f.name, f.category, f.location,
+                       f.is_shared,
+                       f.sharer, f.tagged, (long)f.created_at);
+    fclose(fp);
+    if (wrote < 0) return -2;
+    return f.id;
 }
