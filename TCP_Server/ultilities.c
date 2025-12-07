@@ -268,11 +268,11 @@ int add_favorite(const char *owner, const char *name, const char *category, cons
         return -1;
     }
 
-    int wrote = fprintf(fp, "%d|%s|%s|%s|%s|%d|%s|%s|%ld\n",
+    int data = fprintf(fp, "%d|%s|%s|%s|%s|%d|%s|%s|%ld\n",
                        f.id, f.owner, f.name, f.category, f.location,
                        f.is_shared,
                        f.sharer, f.tagged, (long)f.created_at);
     fclose(fp);
-    if (wrote < 0) return -2;
+    if (data < 0) return -2;
     return f.id;
 }
