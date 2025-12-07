@@ -196,11 +196,7 @@ find_account(const char *username) {
 }
 
 int create_account(const char *username, const char *password) {
-    if (!username || !password) return -1;
-
-    pthread_mutex_lock(&account_lock);
-
-    // Check if username already exists
+    // check username exists
     for (int i = 0; i < accountCount; i++) {
         if (strcmp(accounts[i].username, username) == 0) {
             pthread_mutex_unlock(&account_lock);
