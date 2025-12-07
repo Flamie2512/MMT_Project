@@ -32,15 +32,7 @@ int mark_notification_seen(int notif_id);
 //function 
 void login(const char *username, const char *password);
 void logout(const char *username); 
-void register_account(const char *username, const char *password) {
-     int cre = create_account(username, password);
-        if (cre == 0) {
-            send_request(session->sockfd, "201 Registration successful\r\n");
-        } else if (cre == -2) {
-            send_request(session->sockfd, "404 Username already exists\r\n");
-        }
-}
-
+void register_account(const char *username, const char *password);
 void add_favorite(const char *owner, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
 void delete_favorite(const char *owner, int fav_id);
 void edit_favorite(const char *owner, int fav_id, const char *name, const char *category, const char *location, int is_shared, const char *sharer, const char *tagged);
