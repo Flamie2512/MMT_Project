@@ -76,10 +76,18 @@ void handle_command(client_session_t *session, const char *command){
             send_request(session->sockfd, "400 Invalid REGISTER format\r\n");
             return;
         }
-        register_account(username, password);
+        register_account(session, username, password);
 
     } else if (strncmp(line, "ADD_FAVORITE|", 13) == 0) {
-        
+    char name[128], category[64], location[256];
+
+        if (sscanf(line + 13, "%127[^|]|%63[^|]|%255[^\r\n]",name, category, location) != 3) {
+            send_request(session->sockfd, "400 Invalid ADD_FAVORITE format\r\n");
+            return;
+        }
+
+        add_favorite(session, name, category, location);
+
     } else if (strncmp(line, "LIST_FAVORITES|", 15) == 0) {
         
     } else if (strncmp(line, "DEL_FAVORITE|", 12) == 0) {
@@ -132,6 +140,47 @@ void logout(const char *username) {
         acc->is_logged_in = 0;
     }
     send_request(session->sockfd, "201 Logout successful\r\n");
+}
+
+void register_account(client_session_t *session, const char *username, const char *password) {
+    if (!session) return;
+
+    if (session->logged_in) {
+        send_request(session->sockfd, "403 Already sent\r\n");
+        return;
+    }
+
+    int cre = create_account(username, password);
+
+    if (cre == 0) {
+        send_request(session->sockfd, "201 Created\r\n");
+    } else if (cre == -2) {
+        send_request(session->sockfd, "404 Already exist\r\n");
+    } else {
+        send_request(session->sockfd, "500 Internal Error\r\n");
+    }
+}
+
+void add_favorite(client_session_t *session,const char *name,const char *category,const char *location) {
+
+    if (!session) return;
+
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    int new_id = add_favorite(session->username, name, category, location);
+
+    if (new_id > 0) {
+        char res[128];
+        snprintf(res, sizeof(res), "201 Favorite added|%d\r\n", new_id);
+        send_request(session->sockfd, res);
+    } else if (new_id == 0) {
+        send_request(session->sockfd, "400 Invalid parameters\r\n");
+    } else {
+        send_request(session->sockfd, "500 Could not add favorite\r\n");
+    }
 }
 
 void add_friend_request(const char *from, const char *to) {
