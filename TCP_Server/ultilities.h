@@ -33,4 +33,4 @@ int get_friend_request_by_id(int request_id, FriendRequest *out_request);
 int accept_friend_request(int request_id, const char *requestee);
 int mark_notification_seen(int notif_id);
 
-#endif /* TCP_SERVER_ULTILITIES_H */
+#endif 

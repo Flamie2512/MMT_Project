@@ -24,8 +24,6 @@
 #define MAX_REQUESTS 128
 #define MAX_NOTIFS 128
 
-Account accounts[MAX_USER];
-int accountCount = 0;
 pthread_mutex_t account_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
@@ -41,17 +39,6 @@ void *handle_client(void *arg) {
 
     client_session_t *session = (client_session_t *)arg;
     message[0] = '\0';
-    FavoritePlace user_favorites[MAX_FAVS];
-    int favorites_count = 0;
-
-    FriendRel user_friends[MAX_FRIENDS];
-    int friends_count = 0;
-
-    FriendRequest user_requests[MAX_REQUESTS];
-    int requests_count = 0;
-
-    Notification user_notifications[MAX_NOTIFS];
-    int notifications_count = 0;
     
     pthread_detach(pthread_self());
     
@@ -97,11 +84,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (get_accounts(accounts, MAX_USER, &accountCount) != 0) {
-        accountCount = 0;
-        fprintf(stderr, "Warning: failed to load account list from database.\n");
-    }
-    printf("Loaded %d accounts. Other data will be loaded per-user on login.\n", accountCount);
     int listenfd, connfd;
     struct sockaddr_in serverAddr, clientAddr;
 
