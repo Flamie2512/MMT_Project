@@ -31,7 +31,7 @@ void dispatch_command(client_session_t *session, const char *command) {
     } else if (strncmp(command, "REGISTER|", 9) == 0) {
         handle_register(session, command + 9);
     } else if (strncmp(command, "ADD_FAVORITE|", 13) == 0){
-        handle_add_favorite(session, command + 13);
+        handle_not_implemented(session);
     } else if (strncmp(command, "LIST_FAVORITES", 14) == 0) {
         handle_list_favorites(session, command + 14);
     } else if (strncmp(command, "DEL_FAVORITE|", 12) == 0) {
@@ -73,7 +73,8 @@ static void handle_login(client_session_t *session, const char *payload) {
         return;
     }
 
-    Account *acc = find_account(username);
+    Account *acc = NULL;
+    get_account(username, &acc);
     if (!acc) {
         send_request(session->sockfd, "401 Invalid username or password\r\n");
         return;
@@ -103,7 +104,8 @@ static void handle_logout(client_session_t *session) {
         return;
     }
 
-    Account *acc = find_account(session->username);
+    Account *acc = NULL;
+    get_account(session->username, &acc);
     if (acc) {
         acc->is_logged_in = 0;
     }
@@ -140,31 +142,6 @@ static void handle_register(client_session_t *session, const char *payload) {
 }
 
 
-static void handle_add_favorite(client_session_t *session, const char *payload) {
-    if (!session->logged_in) {
-        send_request(session->sockfd, "405 Not logged in\r\n");
-        return;
-    }
-
-    char name[MAX_TITLE_LEN];
-    char category[MAX_CAT_LEN];
-    char location[MAX_DESC_LEN];
-
-    if (!payload || sscanf(payload, "%127[^|]|%63[^|]|%255[^\r\n]", name, category, location) != 3) {
-        send_bad_request(session, "Invalid ADD_FAVORITE format");
-        return;
-    }
-
-    int fav_id = create_favorite(session->username, name, category, location);
-    if (fav_id < 0) {
-        send_request(session->sockfd, "501 Failed to add favorite\r\n");
-        return;
-    }
-
-    char response[128];
-    snprintf(response, sizeof(response), "200 Add favorite successful: %d\r\n", fav_id);
-    send_request(session->sockfd, response);
-}
 
 static void handle_add_friend(client_session_t *session, const char *payload) {
     if (!session->logged_in) {
@@ -211,13 +188,6 @@ static void handle_add_friend(client_session_t *session, const char *payload) {
     if (get_user_requests(session->username, requests, MAX_REQUESTS, &req_count) != 0) {
         send_request(session->sockfd, "500 Failed to check friend requests\r\n");
         return;
-    }
-
-    for (int i = 0; i < req_count; ++i) {
-        if (strcmp(requests[i].to, target) == 0 && requests[i].status == 0) {
-            send_request(session->sockfd, "410 Friend request already sent\r\n");
-            return;
-        }
     }
 
     int rc = create_friend_request(session->username, target);
@@ -276,63 +246,6 @@ static void handle_list_favorites(client_session_t *session, const char *payload
     }
 }
 
-
-static void handle_accept_friend(client_session_t *session, const char *payload) {
-    if (!session->logged_in) {
-        send_request(session->sockfd, "405 Not logged in\r\n");
-        return;
-    }
-
-    int request_id = 0;
-    if (!payload || sscanf(payload, "%d", &request_id) != 1 || request_id <= 0) {
-        send_bad_request(session, "Invalid ACCEPT_FRIEND format");
-        return;
-    }
-
-    FriendRequest request;
-    memset(&request, 0, sizeof(request));
-    int rc = get_friend_request_by_id(request_id, &request);
-    if (rc == -2) {
-        send_request(session->sockfd, "404 Friend request not found\r\n");
-        return;
-    }
-    if (rc != 0) {
-        send_request(session->sockfd, "500 Failed to load friend request\r\n");
-        return;
-    }
-
-    if (strcmp(request.to, session->username) != 0) {
-        send_request(session->sockfd, "403 Friend request not addressed to you\r\n");
-        return;
-    }
-
-    if (request.status != 0) {
-        send_request(session->sockfd, "409 Friend request already processed\r\n");
-        return;
-    }
-
-    rc = accept_friend_request(request_id, session->username);
-    if (rc == -2) {
-        send_request(session->sockfd, "404 Friend request not found\r\n");
-        return;
-    }
-    if (rc == -3) {
-        send_request(session->sockfd, "409 Friend request already processed\r\n");
-        return;
-    }
-    if (rc == -4) {
-        send_request(session->sockfd, "403 Friend request not addressed to you\r\n");
-        return;
-    }
-    if (rc != 0) {
-        send_request(session->sockfd, "500 Failed to accept friend request\r\n");
-        return;
-    }
-
-    char response[128];
-    snprintf(response, sizeof(response), "200 Friend request accepted %s\r\n", request.from);
-    send_request(session->sockfd, response);
-}
 
 
 static void handle_not_implemented(client_session_t *session) {
