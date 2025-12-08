@@ -1,5 +1,5 @@
 # favorites file: format per line
-# id|owner|name|category|location|is_shared|sharer|tagged|created_at
-1|alice|Hehe Restaurant|Restaurant|Ha Noi|1|bob,charlie|dave,erin|1700001000
-2|bob|Cool Cafe|Cafe|Ha Noi|0|||1700002000
-3|charlie|Sunny Park|Park|Ha Noi|1|alice|bob|1700003000
+# id|name|category|location|is_shared|sharer|tagged|created_at
+1|Hehe Restaurant|Restaurant|Ha Noi|1|bob,charlie|dave,erin|1700001000
+2|Cool Cafe|Cafe|Ha Noi|0|||1700002000
+3|Sunny Park|Park|Ha Noi|1|alice|bob|1700003000

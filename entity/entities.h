@@ -33,7 +33,6 @@ typedef struct friend_rel_t {
 
 typedef struct favorite_place_t {
     int id;
-    char owner[MAX_NAME_LEN];
     char name[MAX_TITLE_LEN];
     char category[MAX_CAT_LEN];
     char location[MAX_DESC_LEN];
