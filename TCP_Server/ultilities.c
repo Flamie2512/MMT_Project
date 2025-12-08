@@ -62,51 +62,34 @@ int recv_response(int sockfd, char *buff, size_t size) {
 	return (int)r;
 }
 
+
+// ACCOUNT MANAGEMENT FUNCTIONS
 int get_accounts(Account accounts_buffer[], int max_users, int *out_count) {
 	if (!accounts_buffer || !out_count || max_users <= 0) return -1;
-	return copy_accounts_from_db(accounts_buffer, max_users, out_count);
+	return db_fetch_accounts(accounts_buffer, max_users, out_count);
 }
 
-Account *find_account(const char *username) {
-	if (!username) return NULL;
-	for (int i = 0; i < accountCount; ++i) {
-		if (strcmp(accounts[i].username, username) == 0) {
-			return &accounts[i];
-		}
-	}
-	return NULL;
+int get_account(const char *username, Account *out_account) {
+	if (!username || !out_account) return NULL;
+	return db_fetch_account(username, out_account);
 }
+
 
 int create_account(const char *username, const char *password) {
 	if (!username || !password) return -1;
 
-	pthread_mutex_lock(&account_lock);
-
-	if (find_account(username)) {
-		pthread_mutex_unlock(&account_lock);
-		return -2;
-	}
-
-	if (accountCount >= MAX_USER) {
-		pthread_mutex_unlock(&account_lock);
-		return -1;
-	}
+	if (find_account(username)) return -2;
+	if (accountCount >= MAX_USER) return -1;
 
 	int db_result = db_create_account(username, password);
-	if (db_result != 0) {
-		pthread_mutex_unlock(&account_lock);
-		return db_result;
-	}
+	if (db_result != 0) return db_result;
 
-	Account new_acc;
-	memset(&new_acc, 0, sizeof(new_acc));
-	strncpy(new_acc.username, username, sizeof(new_acc.username) - 1);
-	strncpy(new_acc.password, password, sizeof(new_acc.password) - 1);
-	new_acc.is_logged_in = 0;
+	Account *slot = &accounts[accountCount++];
+	memset(slot, 0, sizeof(*slot));
+	strncpy(slot->username, username, sizeof(slot->username) - 1);
+	strncpy(slot->password, password, sizeof(slot->password) - 1);
+	slot->is_logged_in = 0;
 
-	accounts[accountCount++] = new_acc;
-
-	pthread_mutex_unlock(&account_lock);
 	return 0;
 }
 
