@@ -124,6 +124,28 @@ int db_fetch_accounts(Account accounts[], int max_users, int *out_count) {
     return 0;
 }
 
+int db_fetch_account(const char *username, Account *out_account) {
+    if (!g_db || !username || !out_account) return -1;
+
+    const char *sql = "SELECT username, password FROM accounts WHERE username = ?";
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
+
+    sqlite3_bind_text(stmt, 1, username, -1, SQLITE_TRANSIENT);
+
+    int step = sqlite3_step(stmt);
+    if (step != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return -2;
+    }
+
+    copy_text(out_account->username, sizeof(out_account->username), sqlite3_column_text(stmt, 0));
+    copy_text(out_account->password, sizeof(out_account->password), sqlite3_column_text(stmt, 1));
+    out_account->is_logged_in = 0;
+
+    sqlite3_finalize(stmt);
+    return 0;
+}
 int db_create_account(const char *username, const char *password) {
     if (!g_db || !username || !password) return -1;
 
@@ -261,20 +283,19 @@ int db_fetch_user_notifications(const char *username, Notification notifications
     return 0;
 }
 
-int db_create_favorite(const char *owner, const char *name, const char *category, const char *location) {
-    if (!g_db || !owner || !name || !category || !location) return -1;
+int db_create_favorite(const char *name, const char *category, const char *location) {
+    if (!g_db || !name || !category || !location) return -1;
 
     const char *sql =
-        "INSERT INTO favorites(owner, name, category, location, is_shared, sharer, tagged, created_at) "
+        "INSERT INTO favorites( name, category, location, is_shared, sharer, tagged, created_at) "
         "VALUES(?, ?, ?, ?, 0, '', '', strftime('%s','now'))";
 
     sqlite3_stmt *stmt = NULL;
     if (sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
 
-    sqlite3_bind_text(stmt, 1, owner, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 2, name, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 3, category, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 4, location, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, category, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, location, -1, SQLITE_TRANSIENT);
 
     int rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
