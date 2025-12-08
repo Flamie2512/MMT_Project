@@ -15,10 +15,8 @@
 #include <strings.h>
 #include <netinet/tcp.h>
 #include <pthread.h>
-
 #include "ultilities.h"
 #include "command_handlers.h"
-
 #define BUFF_SIZE 4096
 #define BACKLOG 2
 #define MAX_FAVS 128
@@ -29,9 +27,6 @@
 Account accounts[MAX_USER];
 int accountCount = 0;
 pthread_mutex_t account_lock = PTHREAD_MUTEX_INITIALIZER;
-
-
-
 
 /**
  * @function handle_client: Handle communication with a connected client.

@@ -174,3 +174,33 @@ int accept_friend_request(int request_id, const char *requestee) {
 int mark_notification_seen(int notif_id) {
 	return db_mark_notification_seen(notif_id);
 }
+
+int add_favorite(const char *owner, const char *name, const char *category, const char *location) {
+    if (!owner || !name || !category || !location) return 0;
+
+    FavoritePlace f;
+    memset(&f, 0, sizeof(f));
+    f.id = get_next_fav_id();
+    strncpy(f.owner, owner, sizeof(f.owner)-1); f.owner[sizeof(f.owner)-1] = '\0';
+    strncpy(f.name, name, sizeof(f.name)-1); f.name[sizeof(f.name)-1] = '\0';
+    strncpy(f.category, category, sizeof(f.category)-1); f.category[sizeof(f.category)-1] = '\0';
+    strncpy(f.location, location, sizeof(f.location)-1); f.location[sizeof(f.location)-1] = '\0';
+    f.is_shared = 0;
+    f.sharer[0] = '\0';
+    f.tagged[0] = '\0';
+    f.created_at = time(NULL);
+
+    FILE *fp = fopen(FAV_PATH, "a");
+    if (!fp) {
+        perror("add_favorite: fopen");
+        return -1;
+    }
+
+    int data = fprintf(fp, "%d|%s|%s|%s|%s|%d|%s|%s|%ld\n",
+                       f.id, f.owner, f.name, f.category, f.location,
+                       f.is_shared,
+                       f.sharer, f.tagged, (long)f.created_at);
+    fclose(fp);
+    if (data < 0) return -2;
+    return f.id;
+}
