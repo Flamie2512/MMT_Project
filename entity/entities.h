@@ -21,7 +21,7 @@ typedef struct friend_request_t {
     int id;
     char from[MAX_NAME_LEN];
     char to[MAX_NAME_LEN];
-    int status; 
+    int status; // 0: pending, 1: accepted
     time_t created_at;
 } FriendRequest;
 
@@ -33,6 +33,7 @@ typedef struct friend_rel_t {
 
 typedef struct favorite_place_t {
     int id;
+    char owner[MAX_NAME_LEN];
     char name[MAX_TITLE_LEN];
     char category[MAX_CAT_LEN];
     char location[MAX_DESC_LEN];
@@ -41,6 +42,11 @@ typedef struct favorite_place_t {
     char tagged[MAX_TAGGED_LEN]; 
     time_t created_at;
 } FavoritePlace;
+
+typedef struct favorite_tags_t {
+    int fav_id;
+    char tagged_users[MAX_TAGGED_LEN];
+} FavoriteTags;
 
 typedef struct notification_t {
     int id;

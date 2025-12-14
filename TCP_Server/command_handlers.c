@@ -26,10 +26,10 @@ void dispatch_command(client_session_t *session, const char *command) {
     }
     if (strncmp(command, "LOGIN|", 6) == 0) {
         handle_login(session, command + 6);
-    } else if (strcmp(command, "LOGOUT") == 0 || strcmp(command, "LOGOUT|") == 0) {
-        handle_logout(session);
     } else if (strncmp(command, "REGISTER|", 9) == 0) {
         handle_register(session, command + 9);
+    } else if (strncmp(command, "LOGOUT|", 7) == 0) {
+        handle_logout(session);
     } else if (strncmp(command, "ADD_FAVORITE|", 13) == 0){
         handle_not_implemented(session);
     } else if (strncmp(command, "LIST_FAVORITES", 14) == 0) {
@@ -166,21 +166,9 @@ static void handle_add_friend(client_session_t *session, const char *payload) {
         return;
     }
 
-    FriendRel friends[MAX_FRIENDS];
-    int friend_count = 0;
-    if (get_user_friends(session->username, friends, MAX_FRIENDS, &friend_count) != 0) {
-        send_request(session->sockfd, "500 Failed to check friendships\r\n");
+    if(check_friendship(session->username, target) == 1 ) {
+        send_request(session->sockfd, "409 Already friends\r\n");
         return;
-    }
-
-    for (int i = 0; i < friend_count; ++i) {
-        const char *a = friends[i].user_a;
-        const char *b = friends[i].user_b;
-        if ((strcmp(a, session->username) == 0 && strcmp(b, target) == 0) ||
-            (strcmp(a, target) == 0 && strcmp(b, session->username) == 0)) {
-            send_request(session->sockfd, "407 Already friends\r\n");
-            return;
-        }
     }
 
     FriendRequest requests[MAX_REQUESTS];
@@ -190,11 +178,16 @@ static void handle_add_friend(client_session_t *session, const char *payload) {
         return;
     }
 
-    int rc = create_friend_request(session->username, target);
-    if (rc == -2) {
-        send_request(session->sockfd, "410 Friend request already sent\r\n");
-        return;
+    if(req_count > 0){
+        for (int i = 0; i < req_count; ++i) {
+            if (strcmp(requests[i].to, target) == 0 && requests[i].status == 0) {
+                send_request(session->sockfd, "410 Friend request already sent\r\n");
+                return;
+            }
+        }
     }
+
+    int rc = create_friend_request(session->username, target);
     if (rc != 0) {
         send_request(session->sockfd, "500 Failed to create friend request\r\n");
         return;
@@ -202,6 +195,49 @@ static void handle_add_friend(client_session_t *session, const char *payload) {
 
     send_request(session->sockfd, "200 Friend request sent\r\n");
 }
+
+void handle_accept_friend(client_session_t *session, const char *payload) {
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    int request_id = 0;
+    if (!payload || sscanf(payload, "%d", &request_id) != 1 || request_id <= 0) {
+        send_bad_request(session, "Invalid ACCEPT_FRIEND format");
+        return;
+    }
+
+    FriendRequest request;
+    int rc = get_friend_request_by_id(request_id, &request);
+    if (rc == -2) {
+        send_request(session->sockfd, "404 Friend request not found\r\n");
+        return;
+    } else if (rc != 0) {
+        send_request(session->sockfd, "500 Failed to fetch friend request\r\n");
+        return;
+    }
+
+    if (strcmp(request.to, session->username) != 0) {
+        send_request(session->sockfd, "403 Not authorized to accept this request\r\n");
+        return;
+    }
+
+    if (request.status != 0) {
+        send_request(session->sockfd, "408 Friend request already accepted\r\n");
+        return;
+    }
+
+    rc = accept_friend_request(request_id, session->username);;
+    if (rc != 0) {
+        send_request(session->sockfd, "500 Failed to accept friend request\r\n");
+        return;
+    }
+
+    send_request(session->sockfd, "200 Friend request accepted\r\n");
+}
+
+   
 
 static void handle_list_favorites(client_session_t *session, const char *payload) {
     if (!session->logged_in) {

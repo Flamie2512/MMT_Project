@@ -14,17 +14,7 @@ extern Account accounts[];
 extern int accountCount;
 extern pthread_mutex_t account_lock;
 
-static int copy_accounts_from_db(Account accounts[], int max_users, int *out_count) {
-	int fetched = 0;
-	int rc = db_fetch_accounts(accounts, max_users, &fetched);
-	if (rc != 0) return rc;
-	if (out_count) *out_count = fetched;
-	for (int i = 0; i < fetched; ++i) {
-		accounts[i].is_logged_in = 0;
-	}
-	return 0;
-}
-
+// DATA HELPER FUNCTIONS
 int init_data_store(const char *db_path) {
 	const char *path = db_path ? db_path : "data/mmt.db";
 	return db_initialize(path);
@@ -34,6 +24,7 @@ void shutdown_data_store(void) {
 	db_shutdown();
 }
 
+// NETWORK COMMUNICATION FUNCTIONS
 int send_request(int sockfd, const char *buf) {
 	if (!buf) {
 		errno = EINVAL;
@@ -93,6 +84,8 @@ int create_account(const char *username, const char *password) {
 	return 0;
 }
 
+
+// FAVORITE MANAGEMENT FUNCTIONS
 int get_user_favorites(const char *username, FavoritePlace favs[], int max, int *out_count) {
 	if (!username || !out_count || max <= 0) return -1;
 	if (!favs) {
@@ -102,6 +95,30 @@ int get_user_favorites(const char *username, FavoritePlace favs[], int max, int 
 	return db_fetch_user_favorites(username, favs, max, out_count);
 }
 
+int create_favorite(const char *owner, const char *name, const char *category, const char *location) {
+	if (!owner || !name || !category || !location) return -1;
+	return db_create_favorite(owner, name, category, location);
+}
+
+int update_favorite(int fav_id, const char *owner, const char *name, const char *category, const char *location) {
+	if (fav_id <= 0 || !owner || !name || !category || !location) return -1;
+	return db_update_favorite(fav_id, owner, name, category, location);
+}
+
+int delete_favorite(int fav_id, const char *owner) {
+	if(fav_id <= 0 || !owner) return -1;
+	return db_delete_favorite(fav_id, owner);
+}
+
+int share_favorite(int fav_id, const char *sharer, const char *tagged_users) {
+	if (fav_id <= 0 || !sharer || !tagged_users) return -1;
+	return db_share_favorite(fav_id, sharer, tagged_users);
+}
+
+
+
+
+// FRIEND MANAGEMENT FUNCTIONS
 int get_user_friends(const char *username, FriendRel frs[], int max, int *out_count) {
 	if (!username || !out_count || max <= 0) return -1;
 	if (!frs) {
@@ -110,6 +127,13 @@ int get_user_friends(const char *username, FriendRel frs[], int max, int *out_co
 	}
 	return db_fetch_user_friends(username, frs, max, out_count);
 }
+
+int accept_friend_request(int request_id, const char *requestee) {
+	if (!requestee || request_id <= 0) return -1;
+	return db_accept_friend_request(request_id, requestee);
+}
+
+
 
 int get_user_requests(const char *username, FriendRequest reqs[], int max, int *out_count) {
 	if (!username || !out_count || max <= 0) return -1;
@@ -120,24 +144,7 @@ int get_user_requests(const char *username, FriendRequest reqs[], int max, int *
 	return db_fetch_user_requests(username, reqs, max, out_count);
 }
 
-int get_user_notifications(const char *username, Notification notifs[], int max, int *out_count) {
-	if (!username || !out_count || max <= 0) return -1;
-	if (!notifs) {
-		*out_count = 0;
-		return 0;
-	}
-	return db_fetch_user_notifications(username, notifs, max, out_count);
-}
-
-int create_favorite(const char *owner, const char *name, const char *category, const char *location) {
-	if (!owner || !name || !category || !location) return -1;
-	return db_create_favorite(owner, name, category, location);
-}
-
-int update_favorite(int fav_id, const char *owner, const char *name, const char *category, const char *location) {
-	if (!owner || !name || !category || !location) return -1;
-	return db_update_favorite(fav_id, owner, name, category, location);
-}
+\
 
 int create_friend_request(const char *from, const char *to) {
 	if (!from || !to) return -1;
@@ -154,36 +161,45 @@ int accept_friend_request(int request_id, const char *requestee) {
 	return db_accept_friend_request(request_id, requestee);
 }
 
-int mark_notification_seen(int notif_id) {
-	return db_mark_notification_seen(notif_id);
+int reject_friend_request(int request_id, const char *requestee) {
+	if (!requestee || request_id <= 0) return -1;
+	return db_reject_friend_request(request_id, requestee);
 }
 
-int add_favorite(const char *owner, const char *name, const char *category, const char *location) {
-    if (!owner || !name || !category || !location) return 0;
+int remove_friendship(const char *user_a, const char *user_b) {
+	if (!user_a || !user_b) return -1;
+	return db_remove_friendship(user_a, user_b);
+}
 
-    FavoritePlace f;
-    memset(&f, 0, sizeof(f));
-    f.id = get_next_fav_id();
-    strncpy(f.owner, owner, sizeof(f.owner)-1); f.owner[sizeof(f.owner)-1] = '\0';
-    strncpy(f.name, name, sizeof(f.name)-1); f.name[sizeof(f.name)-1] = '\0';
-    strncpy(f.category, category, sizeof(f.category)-1); f.category[sizeof(f.category)-1] = '\0';
-    strncpy(f.location, location, sizeof(f.location)-1); f.location[sizeof(f.location)-1] = '\0';
-    f.is_shared = 0;
-    f.sharer[0] = '\0';
-    f.tagged[0] = '\0';
-    f.created_at = time(NULL);
+int check_friendship(const char *user_a, const char *user_b) {
+	if (!user_a || !user_b) return -1;
+	return db_check_friendship(user_a, user_b);
+}
 
-    FILE *fp = fopen(FAV_PATH, "a");
-    if (!fp) {
-        perror("add_favorite: fopen");
-        return -1;
-    }
+int tag_favorite(int fav_id, const char *tagged_users) {
+	if (fav_id <= 0 || !tagged_users) return -1;
+	return db_tag_friend_to_favorite(fav_id, tagged_users);
+}
 
-    int data = fprintf(fp, "%d|%s|%s|%s|%s|%d|%s|%s|%ld\n",
-                       f.id, f.owner, f.name, f.category, f.location,
-                       f.is_shared,
-                       f.sharer, f.tagged, (long)f.created_at);
-    fclose(fp);
-    if (data < 0) return -2;
-    return f.id;
+int list_tagged_favorites(const char *username, FavoritePlace favs[], int max, int *out_count) {
+	if (!username || !out_count || max <= 0) return -1;
+	if (!favs) {
+		*out_count = 0;
+		return 0;
+	}
+	return db_fetch_tagged_favorites(username, favs, max, out_count);
+}
+
+// NOTIFICATION MANAGEMENT FUNCTIONS
+int get_user_notifications(const char *username, Notification notifs[], int max, int *out_count) {
+	if (!username || !out_count || max <= 0) return -1;
+	if (!notifs) {
+		*out_count = 0;
+		return 0;
+	}
+	return db_fetch_user_notifications(username, notifs, max, out_count);
+}
+
+int mark_notification_seen(int notif_id) {
+	return db_mark_notification_seen(notif_id);
 }
