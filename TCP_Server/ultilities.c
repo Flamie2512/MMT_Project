@@ -115,6 +115,11 @@ int share_favorite(int fav_id, const char *sharer, const char *tagged_users) {
 	return db_share_favorite(fav_id, sharer, tagged_users);
 }
 
+int get_favorite_by_id(int fav_id, FavoritePlace *out_fav) {
+	if (fav_id <= 0 || !out_fav) return -1;
+	return db_fetch_favorite_by_id(fav_id, out_fav);
+}
+
 
 
 
@@ -144,7 +149,6 @@ int get_user_requests(const char *username, FriendRequest reqs[], int max, int *
 	return db_fetch_user_requests(username, reqs, max, out_count);
 }
 
-\
 
 int create_friend_request(const char *from, const char *to) {
 	if (!from || !to) return -1;
@@ -176,9 +180,9 @@ int check_friendship(const char *user_a, const char *user_b) {
 	return db_check_friendship(user_a, user_b);
 }
 
-int tag_favorite(int fav_id, const char *tagged_users) {
-	if (fav_id <= 0 || !tagged_users) return -1;
-	return db_tag_friend_to_favorite(fav_id, tagged_users);
+int tag_favorite(int fav_id, const char *tagger, const char *tagged_users) {
+	if (fav_id <= 0 || !tagger || !tagged_users) return -1;
+	return db_tag_friend_to_favorite(fav_id, tagger, tagged_users);
 }
 
 int list_tagged_favorites(const char *username, FavoritePlace favs[], int max, int *out_count) {

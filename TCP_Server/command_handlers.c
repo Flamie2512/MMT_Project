@@ -238,48 +238,87 @@ void handle_accept_friend(client_session_t *session, const char *payload) {
 }
 
    
-
-static void handle_list_favorites(client_session_t *session, const char *payload) {
+void handle_tag_friend(client_session_t *session, const char *payload) {
     if (!session->logged_in) {
         send_request(session->sockfd, "405 Not logged in\r\n");
         return;
     }
 
-    if (payload && payload[0] != '\0') {
-        const char *extra = payload;
-        if (extra[0] == '|') extra++;
-        while (*extra == ' ') extra++;
-        if (*extra != '\0') {
-            send_bad_request(session, "Invalid LIST_FAVORITES format");
-            return;
-        }
-    }
+    int fav_id = 0;
+    char tagged_users[MAX_TAGGED_LEN];
 
-    FavoritePlace favorites[MAX_FAVS];
-    int fav_count = 0;
-    if (get_user_favorites(session->username, favorites, MAX_FAVS, &fav_count) != 0) {
-        send_request(session->sockfd, "500 Failed to fetch favorites\r\n");
+    if (!payload || sscanf(payload, "%d|%255[^|]|%255[^\r\n]", &fav_id,tagger,tagged_user) != 3) {
+        send_bad_request(session, "Invalid TAG_FRIEND format");
         return;
     }
 
-    char header[64];
-    snprintf(header, sizeof(header), "200 Favorites %d\r\n", fav_count);
-    send_request(session->sockfd, header);
-
-    for (int i = 0; i < fav_count; ++i) {
-        char line[768];
-        snprintf(line, sizeof(line),
-                 "210 %d|%s|%s|%s|%d|%s|%s|%lld\r\n",
-                 favorites[i].id,
-                 favorites[i].name,
-                 favorites[i].category,
-                 favorites[i].location,
-                 favorites[i].is_shared,
-                 favorites[i].sharer,
-                 favorites[i].tagged,
-                 (long long)favorites[i].created_at);
-        send_request(session->sockfd, line);
+    if(strcmp(tagger, session->username) != 0){
+        send_request(session->sockfd, "403 Not authorized to tag friends\r\n");
+        return;
     }
+
+    if(get_favorite_by_id(fav_id, NULL) != 0){
+        send_request(session->sockfd, "404 Favorite not found\r\n");
+        return;
+    }
+
+    if(get_account(tagged_user, NULL) != 0){
+        send_request(session->sockfd, "404 tagged user not found\r\n");
+        return;
+    }
+
+    int rc = tag_favorite(fav_id, tagged_users);
+    if (rc == -2) {
+        send_request(session->sockfd, "404 Favorite not found\r\n");
+        return;
+    } else if (rc != 0) {
+        send_request(session->sockfd, "500 Failed to tag friends\r\n");
+        return;
+    }
+
+    send_request(session->sockfd, "200 Friends tagged successfully\r\n");
+}
+
+
+void handle_reject_friend(client_session_t *session, const char *payload) {
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    int request_id = 0;
+    if (!payload || sscanf(payload, "%d", &request_id) != 1 || request_id <= 0) {
+        send_bad_request(session, "Invalid ACCEPT_FRIEND format");
+        return;
+    }
+
+    FriendRequest request;
+    int rc = get_friend_request_by_id(request_id, &request);
+    if (rc == -2) {
+        send_request(session->sockfd, "404 Friend request not found\r\n");
+        return;
+    } else if (rc != 0) {
+        send_request(session->sockfd, "500 Failed to fetch friend request\r\n");
+        return;
+    }
+    
+    if (strcmp(request.to, session->username) != 0) {
+        send_request(session->sockfd, "403 Not authorized to reject this request\r\n");
+        return;
+    }
+
+    if (request.status != 0) {
+        send_request(session->sockfd, "408 Friend request already rejected\r\n");
+        return;
+    }
+
+    rc = reject_friend_request(request_id, session->username);;
+    if (rc != 0) {
+        send_request(session->sockfd, "500 Failed to accept friend request\r\n");
+        return;
+    }
+
+    send_request(session->sockfd, "200 Friend request accepted\r\n");
 }
 
 
