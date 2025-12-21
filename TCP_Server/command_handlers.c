@@ -1,5 +1,6 @@
 #include "command_handlers.h"
 #include "ultilities.h"
+#include "../entity/entities.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +13,7 @@ static void handle_add_friend(client_session_t *session, const char *payload);
 static void handle_accept_friend(client_session_t *session, const char *payload);
 static void handle_list_favorites(client_session_t *session, const char *payload);
 static void handle_edit_favorite(client_session_t *session, const char *payload);
+static void handle_delete_favorite(client_session_t *session, const char *payload);
 static void handle_not_implemented(client_session_t *session);
 
 static void send_bad_request(client_session_t *session, const char *message) {
@@ -31,11 +33,11 @@ void dispatch_command(client_session_t *session, const char *command) {
     } else if (strncmp(command, "LOGOUT|", 7) == 0) {
         handle_logout(session);
     } else if (strncmp(command, "ADD_FAVORITE|", 13) == 0){
-        handle_not_implemented(session);
+        handle_add_favorite(session, command + 13);
     } else if (strncmp(command, "LIST_FAVORITES", 14) == 0) {
         handle_list_favorites(session, command + 14);
     } else if (strncmp(command, "DEL_FAVORITE|", 12) == 0) {
-        handle_not_implemented(session);
+        handle_delete_favorite(session, command + 12);
     }
     else if ( strncmp(command, "SHARE_FAVORITE|", 15) == 0 ){
         handle_not_implemented(session);
@@ -98,6 +100,31 @@ static void handle_login(client_session_t *session, const char *payload) {
     send_request(session->sockfd, "200 Login successful\r\n");
 }
 
+static void handle_add_favorite(client_session_t *session, const char *payload) {
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    char name[MAX_TITLE_LEN];
+    char category[MAX_CAT_LEN];
+    char location[MAX_DESC_LEN];
+
+    if (!payload || sscanf(payload, "%127[^|]|%63[^|]|%255[^\r\n]", name, category, location) != 3) {
+        send_bad_request(session, "Invalid ADD_FAVORITE format");
+        return;
+    }
+
+    int result = create_favorite(session->username, name, category, location);
+    if (result > 0) {
+        char response[128];
+        snprintf(response, sizeof(response), "200 Favorite added (ID: %d)\r\n", result);
+        send_request(session->sockfd, response);
+    } else {
+        send_request(session->sockfd, "500 Failed to add favorite\r\n");
+    }
+}
+
 static void handle_logout(client_session_t *session) {
     if (!session->logged_in) {
         send_request(session->sockfd, "405 Not logged in\r\n");
@@ -134,13 +161,10 @@ static void handle_register(client_session_t *session, const char *payload) {
         send_request(session->sockfd, "200 Register successful\r\n");
     } else if (result == -2) {
         send_request(session->sockfd, "404 Username already exists\r\n");
-    } else if (result == -1) {
-        send_request(session->sockfd, "500 Server full, cannot register\r\n");
     } else {
         send_request(session->sockfd, "500 Internal server error\r\n");
     }
 }
-
 
 
 static void handle_add_friend(client_session_t *session, const char *payload) {
@@ -283,6 +307,54 @@ static void handle_list_favorites(client_session_t *session, const char *payload
 }
 
 
+
+static void handle_edit_favorite(client_session_t *session, const char *payload) {
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    int fav_id = 0;
+    char name[MAX_TITLE_LEN];
+    char category[MAX_CAT_LEN];
+    char location[MAX_DESC_LEN];
+
+    if (!payload || sscanf(payload, "%d|%127[^|]|%63[^|]|%255[^\n]", &fav_id, name, category, location) != 4) {
+        send_bad_request(session, "Invalid EDIT_FAVORITE format");
+        return;
+    }
+
+    int rc = update_favorite(fav_id, session->username, name, category, location);
+    if (rc == 0) {
+        send_request(session->sockfd, "200 Favorite updated\r\n");
+    } else if (rc == -2) {
+        send_request(session->sockfd, "404 Favorite not found\r\n");
+    } else {
+        send_request(session->sockfd, "500 Failed to update favorite\r\n");
+    }
+}
+
+static void handle_delete_favorite(client_session_t *session, const char *payload) {
+    if (!session->logged_in) {
+        send_request(session->sockfd, "405 Not logged in\r\n");
+        return;
+    }
+
+    int fav_id = 0;
+    if (!payload || sscanf(payload, "%d", &fav_id) != 1 || fav_id <= 0) {
+        send_bad_request(session, "Invalid DEL_FAVORITE format");
+        return;
+    }
+
+    int rc = delete_favorite(fav_id, session->username);
+    if (rc == 0) {
+        send_request(session->sockfd, "200 Favorite deleted\r\n");
+    } else if (rc == -2) {
+        send_request(session->sockfd, "404 Favorite not found\r\n");
+    } else {
+        send_request(session->sockfd, "500 Failed to delete favorite\r\n");
+    }
+}
 
 static void handle_not_implemented(client_session_t *session) {
     send_request(session->sockfd, "501 Not implemented\r\n");
